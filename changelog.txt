@@ -5,3 +5,11 @@ v0.0.6
 - Improved game loop for neural network
     - Added score
 - First executable version with neural networks (needs further fps improvements)
+
+
+v0.0.7
+- Added breeding and mutation algorithms
+- Removed unneccessary player.py, main_new.py
+- Added next generation processing
+- Added UI (User Interface) for epoch and network alive number
+- Added level reset logic when all networks died

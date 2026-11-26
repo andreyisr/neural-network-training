@@ -1,6 +1,6 @@
 import pygame as pg
 import numpy as np
-import sys, math
+import sys, math, random
 from helper import Helper
 from neural_network import NeuralNetwork
 
@@ -9,7 +9,7 @@ helper = Helper()
 # Defining Constant Variables
 SCREEN_X = 1280
 SCREEN_Y = 720
-FPS = 40
+FPS = 100
 
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
@@ -19,9 +19,9 @@ BLUE = (0, 0, 255)
 TEAL = (0, 255, 255)
 
 # Neural Network variables
-population_size = 1000
+population_size = 100
 breeding_amount = 10
-mutation_amount = 0.2
+mutation_amount = 0.4
 
 # Initiating Pygame with all parameters
 pg.init()
@@ -95,9 +95,7 @@ def start_generation(population_size):
 
     return network_list
 
-def get_game_inputs(x, y, save_frame, raw_level):
-    column = (save_frame * 8 + x) / 40
-    row = y / 40
+def get_game_inputs(x, y, save_frame, raw_level, ascending):
     ray_angles = [90, 70, 45, 0, -45, -70, -90]
     distance = 10
     ray_values = []
@@ -109,14 +107,41 @@ def get_game_inputs(x, y, save_frame, raw_level):
             temp_column = math.floor((save_frame * 8 + (x + step_x)) / 40)
 
             # Checks that the ray endpoint is within bounds (on screen), otherwise I can't access tile at that potition
-            if 0 > temp_row >= 15 and 0 > temp_column >= len(raw_level[0]):
+            if 0 <= temp_row < 15 and 0 <= temp_column < len(raw_level[0]):
                 if (raw_level[temp_row][temp_column] == '1' or raw_level[temp_row][temp_column] == '2'):
                     ray_values.append(step / 20)
                     break
         else:
             ray_values.append(1.0)
 
+    ray_values.append(y / 600)
+    ray_values.append(float(ascending))
     return ray_values
+
+
+def next_generation(old_networks, epoch):
+    # Sorts the networks from best to worst to use for the next generation
+    old_networks.sort(key=lambda n: n.score, reverse=True)
+    new_networks = []
+
+    # Create a brain for every good performing network (:breeding amount leaves only the amount needed for breeding and removes everything else)
+    best_networks = [n.brain for n in old_networks[:breeding_amount]]
+    for network in best_networks:
+        copy_brain = NeuralNetwork([network.h1, network.h2, network.o], [network.bh1, network.bh2, network.bo], epoch)
+        new_networks.append(AIPlayer(copy_brain))
+
+    # Creates 990 more new networks
+    for _ in range(population_size - breeding_amount):
+        parent_1 = random.choice(best_networks)
+        parent_2 = random.choice(best_networks)
+
+        child_brain = parent_1.breed(parent_2)
+        child_brain.mutate(mutation_amount)
+
+        new_networks.append(AIPlayer(child_brain))
+
+    return new_networks
+
 
 
 
@@ -146,7 +171,7 @@ def game():
     networks = start_generation(population_size)
 
     # Creating Initial Population
-    # epoch = 0
+    epoch = 0
     # population = [NeuralNetwork(epoch=epoch) for i in range(population_size)]
 
     while True:
@@ -213,7 +238,7 @@ def game():
             if network.alive == False:
                 continue
             # Input handling of specific networks
-            inputs = get_game_inputs(network.x, network.y, save_frame, raw_level)
+            inputs = get_game_inputs(network.x, network.y, save_frame, raw_level, network.ascending)
             action = network.brain.predict(np.array(inputs))
             if action == 1:
                 network.space_pressed = True
@@ -367,25 +392,31 @@ def game():
         SCREEN.blit(temp_surface, (420, 0))
         # pg.draw.rect(SCREEN, (0, 0, 0), (420, 0, 400, 40))
         progress_percentage = min(max((save_frame - 20)/(level_length - 20), 0), 1)
-        if progress_percentage == 1:
-            sys.exit()
-            pg.quit()
-        else:
-            networks_alive = len(networks)
-            for network in networks:
-                if network.alive == False:
-                    networks_alive -= 1
-            if networks_alive == 0:
-                sys.exit()
-                pg.quit()
-        print(progress_percentage)
+        networks_alive = len(networks)
+        for network in networks:
+            if network.alive == False:
+                networks_alive -= 1
+        if networks_alive == 0 or progress_percentage >= 1:
+            epoch += 1
+            networks = next_generation(networks, epoch)
+            save_frame = 0
+            bg_shift = 0
+            helper.tile_list.clear()
+            helper.load_tiles(raw_level)
+            continue
+
+        # print(progress_percentage)
         pg.draw.rect(SCREEN, (255, 255, 255, 128), (510, 10, 300, 20), 4, 45)
         pg.draw.rect(SCREEN, (255, 255, 255), (514, 14, 3, 12))
         pg.draw.rect(SCREEN, (255, 255, 255), (517, 14, progress_percentage * 293, 16))
         text = font.render(f'{round(progress_percentage * 100)} %', True, (255, 255, 255))
         SCREEN.blit(text, (440, 10))
 
-        print("Networks alive:", networks_alive)
+        # print("Networks alive:", networks_alive)
+        text = font.render(f'Networks Alive: {networks_alive}', True, (255, 255, 255))
+        SCREEN.blit(text, (50, 20))
+        text = font.render(f'Epoch: {epoch}', True, (255, 255, 255))
+        SCREEN.blit(text, (50, 50))
         
         # Shifting background and blocks by 8
         bg_shift -= 8
