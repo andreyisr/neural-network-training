@@ -36,6 +36,9 @@ class Helper():
                 return self.block_img
             elif tile == "2":
                 return self.spike_img
+
+    def get_level_length(self, level):
+        return len(level[0])
     
 
     def load_tiles(self, level):
