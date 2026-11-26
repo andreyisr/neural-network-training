@@ -1,5 +1,6 @@
 import pygame as pg
-import random, sys
+import numpy as np
+import sys, math
 from helper import Helper
 from neural_network import NeuralNetwork
 
@@ -52,6 +53,12 @@ player_x = 200
 player_y = 555
 
 epoch = 0
+ray_cos = []
+ray_sin = []
+for ray in [90, 70, 45, 0, -45, -70, -90]:
+    radians = math.radians(ray)
+    ray_cos.append(math.cos(radians))
+    ray_sin.append(math.sin(radians))
 
 font = pg.font.Font(None, 36)
 
@@ -84,16 +91,32 @@ def start_generation(population_size):
 
     network_list = []
     for network in range(population_size):
-        network_list.append(AIPlayer(NeuralNetwork(epoch=epoch)))
+        network_list.append(AIPlayer(NeuralNetwork(None, None, epoch=epoch)))
 
     return network_list
 
-# def get_game_inputs(x, y, bg_shift, save_frame):
-#     column = (save_frame * 8 + x) / 40
-#     row = y / 40
-#     raw_level = helper.load_map()
-#     ray_angles = [90, 80, 70, 60, 50, 40, 30, 20, 10, 0, -10, -20, -30, -40, -50, -60, -70, -80, -90]
-#     for ray in ray_angles:
+def get_game_inputs(x, y, save_frame, raw_level):
+    column = (save_frame * 8 + x) / 40
+    row = y / 40
+    ray_angles = [90, 70, 45, 0, -45, -70, -90]
+    distance = 10
+    ray_values = []
+    for index, ray in enumerate(ray_angles):
+        for step in range(20):
+            step_x = ray_cos[index] * distance * step
+            step_y = ray_sin[index] * distance * step
+            temp_row = math.floor((y + step_y) / 40)
+            temp_column = math.floor((save_frame * 8 + (x + step_x)) / 40)
+
+            # Checks that the ray endpoint is within bounds (on screen), otherwise I can't access tile at that potition
+            if 0 > temp_row >= 15 and 0 > temp_column >= len(raw_level[0]):
+                if (raw_level[temp_row][temp_column] == '1' or raw_level[temp_row][temp_column] == '2'):
+                    ray_values.append(step / 20)
+                    break
+        else:
+            ray_values.append(1.0)
+
+    return ray_values
 
 
 
@@ -172,7 +195,6 @@ def game():
 
         # if save_frame % 5 == 0:
 
-        # Accelerated fly-in of character before start of level
 
         # if ascending and on_roof == False:
         #     player_positions.append((player_x + 17, player_y + 35))
@@ -191,7 +213,8 @@ def game():
             if network.alive == False:
                 continue
             # Input handling of specific networks
-            action = prediction_of_ai
+            inputs = get_game_inputs(network.x, network.y, save_frame, raw_level)
+            action = network.brain.predict(np.array(inputs))
             if action == 1:
                 network.space_pressed = True
                 network.display = player_up
@@ -248,6 +271,7 @@ def game():
             # Trail position management (deleting if offscreen by more than 10px)
             network.player_positions = [(x - 8, y) for x, y in network.player_positions if x - 8 >= -10]
 
+            # Accelerated fly-in of character before start of level
             if network.save_frame < 60:
                 network.x = network.save_frame * 3.5 - 6.5
             
@@ -319,10 +343,9 @@ def game():
                     network.on_block = True
                     network.block_on = tile
                     network.y = tile_rect.y - player.get_height()
-                if pg.mask.from_surface(network.display).overlap(pg.mask.from_surface(tile[0]), (tile_rect.x - network.x, tile_rect.y - network.y)) and (tile[2] == "assets/spike.png" or tile_rect.top < network.y + network.display.get_height() / 2 < tile_rect.bottom):
+                network_rect = network.display.get_rect(topleft=(network.x,network.y))
+                if network_rect.colliderect(tile[1]) and (tile[2] == "assets/spike.png" or tile_rect.top < network.y + network.display.get_height() / 2 < tile_rect.bottom):
                     network.alive = False
-                else:
-                    network.score += 1
                 # if tile[1].x < -5000: 
                 #     # print("You won")
                 #     continue
@@ -332,6 +355,10 @@ def game():
                 SCREEN.blit(network.display, (network.x, network.y - 4))
             else:
                 SCREEN.blit(network.display, (network.x, network.y))
+
+            if network.alive == True:
+                network.score += 1
+            network.save_frame += 1
 
 
         # Progress Bar

@@ -1,0 +1,7 @@
+v0.0.6
+- Changed input nuerons from 6 to 7
+- Added ray-casting
+    - Casts 7 rays into different directions and detects collision with blocks
+- Improved game loop for neural network
+    - Added score
+- First executable version with neural networks (needs further fps improvements)

@@ -13,8 +13,8 @@ class NeuralNetwork():
 
         if weights is None:
             # Initializing all neural network layers (hidden layers and output layers)
-            # 6 inputs connecting to 12 in layer 2, then those 12 connecting to h2 with 6 and finally to output with 1
-            self.h1 = np.random.randn(6, 12)
+            # 7 inputs connecting to 12 in layer 2, then those 12 connecting to h2 with 6 and finally to output with 1
+            self.h1 = np.random.randn(7, 12)
             self.h2 = np.random.randn(12, 6)
             self.o = np.random.randn(6, 1)
 
